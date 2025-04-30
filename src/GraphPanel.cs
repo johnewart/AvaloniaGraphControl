@@ -2,11 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Runtime.Serialization;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
-using Avalonia.Media;
 
 namespace AvaloniaGraphControl
 {
@@ -53,11 +51,14 @@ namespace AvaloniaGraphControl
       if (Graph == null)
         return;
       Children.Clear();
-      idGenerator = new ObjectIDGenerator();
+      
       var edgeVMs = Graph.Edges.ToArray();
-      var nodeVMs = edgeVMs.Select(e => e.Head).Concat(edgeVMs.Select(e => e.Tail)).Distinct().Select(nvm => new NodeWrapper(nvm, idGenerator)).ToDictionary(nw => nw.VM, nw => nw);
-      var parentVMs = nodeVMs.Select(kv => Graph.Parent[kv.Key]).Where(pvm => pvm != null).Distinct().Select(pvm => nodeVMs[pvm]).ToArray();
-      var leafVMs = nodeVMs.Values.Except(parentVMs).ToArray();
+      //var nodeVMs = edgeVMs.Select(e => e.Head).Concat(edgeVMs.Select(e => e.Tail)).Distinct().Select(nvm => new NodeWrapper(nvm, idGenerator)).ToDictionary(nw => nw.VM, nw => nw);
+      var nodeVMs = Graph.Nodes.Select(node => new NodeWrapper(node)).ToDictionary(nw => nw.VM, nw => nw);
+      var parentVMs = nodeVMs.Select(kv => Graph.Parent[kv.Key]).Where(pvm => pvm != null).Distinct().Select(pvm => nodeVMs[pvm!]).ToArray();
+      var unrootedNodes = nodeVMs.Select(kv => Graph.UnlinkedNodes.Contains(kv.Value.VM as Node) ? kv.Value : null).Where(n => n != null).ToArray();
+      var leafVMs = nodeVMs.Values.Except(parentVMs).Except(unrootedNodes).ToArray();
+      
       graph = new Microsoft.Msagl.Drawing.Graph
       {
         LayoutAlgorithmSettings = CurrentLayoutSettings
@@ -82,6 +83,28 @@ namespace AvaloniaGraphControl
         var pGraph = (parent == null) ? graph.RootSubgraph : (Microsoft.Msagl.Drawing.Subgraph)nodeVMs[parent].DNode;
         pGraph.AddSubgraph((Microsoft.Msagl.Drawing.Subgraph)sgvm.DNode);
       }
+      
+      foreach (var sgvm in unrootedNodes)
+      {
+        var sg = new Microsoft.Msagl.Drawing.Subgraph(sgvm.ID);
+        sgvm.DNode = sg;
+        var ctrl = CreateControl(sgvm.VM, n => new TextSticker
+        {
+          Text = n.ToString(),
+          HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Stretch,
+          VerticalAlignment = Avalonia.Layout.VerticalAlignment.Stretch
+        }, 1);
+        vmOfCtrl[ctrl] = sgvm;
+      }
+      
+      foreach (var nodeWrapper in unrootedNodes)
+      {
+        var subgraph = graph.RootSubgraph;
+        var dNode = graph.AddNode(nodeWrapper.ID);
+        nodeWrapper.DNode = dNode;
+        subgraph.AddNode(dNode);
+      }
+      
       foreach (var evm in edgeVMs)
       {
         var dEdge = graph.AddEdge(nodeVMs[evm.Tail].ID, nodeVMs[evm.Head].ID);
@@ -98,6 +121,9 @@ namespace AvaloniaGraphControl
         var ctrl = CreateControl(nvm.VM, n => new TextSticker { Text = n.ToString() }, 4);
         vmOfCtrl[ctrl] = nvm;
         var parent = Graph.Parent[nvm.VM];
+
+        //((Microsoft.Msagl.Drawing.Subgraph)nvm.DNode).AddNode(dNode);
+
         if (parent != null)
         {
           var pw = nodeVMs[parent];
@@ -133,7 +159,7 @@ namespace AvaloniaGraphControl
         if (!evm.Label.Equals(string.Empty))
         {
           var ctrl = CreateControl(evm.Label, l => new TextBlock { Text = l.ToString(), FontSize = 6 }, 3);
-          vmOfCtrl[ctrl] = new LabelWrapper(evm.Label, idGenerator, evm.DEdge.Label);
+          vmOfCtrl[ctrl] = new LabelWrapper(evm.Label, evm.DEdge.Label);
         }
       }
     }
@@ -149,15 +175,14 @@ namespace AvaloniaGraphControl
     }
 
     Microsoft.Msagl.Drawing.Graph graph;
-    ObjectIDGenerator idGenerator;
     Dictionary<Control, Wrapper> vmOfCtrl;
 
     abstract class Wrapper
     {
-      public Wrapper(object vm, ObjectIDGenerator idGen)
+      public Wrapper(object vm, string id)
       {
         VM = vm;
-        ID = idGen.GetId(vm, out bool _).ToString();
+        ID = id;
       }
       public readonly object VM;
       public readonly string ID;
@@ -168,7 +193,7 @@ namespace AvaloniaGraphControl
 
     class LabelWrapper : Wrapper
     {
-      public LabelWrapper(object label, ObjectIDGenerator idGen, Microsoft.Msagl.Drawing.Label dLabel) : base(label, idGen)
+      public LabelWrapper(object label, Microsoft.Msagl.Drawing.Label dLabel) : base(label, Guid.NewGuid().ToString())
       {
         DLabel = dLabel;
       }
@@ -184,14 +209,16 @@ namespace AvaloniaGraphControl
 
     class NodeWrapper : Wrapper
     {
-      public NodeWrapper(object node, ObjectIDGenerator idGen) : base(node, idGen) { }
+      public NodeWrapper(Node node) : base(node, node.Id) { }
 
-      public Microsoft.Msagl.Drawing.Node DNode { get; set; }
+      public new Node VM => (Node)base.VM;
+      
+      public Microsoft.Msagl.Drawing.Node? DNode { get; set; }
 
-      internal override Microsoft.Msagl.Core.Geometry.Rectangle GetBoundingBox() => DNode.BoundingBox;
+      internal override Microsoft.Msagl.Core.Geometry.Rectangle GetBoundingBox() => DNode?.BoundingBox ?? new Microsoft.Msagl.Core.Geometry.Rectangle(0, 0, 0, 0);
       internal override void UpdateBounds(Control ctrl)
       {
-        if (DNode.GeometryNode == null)
+        if (DNode?.GeometryNode == null)
           return;
         var (shape, borderRadius) = ctrl is TextSticker ts ? (ts.Shape, ts.BorderRadius) : (TextSticker.Shapes.Rectangle, 0);
         DNode.GeometryNode.BoundaryCurve = AglCurveFactory.Create(shape, ctrl.DesiredSize, borderRadius);
