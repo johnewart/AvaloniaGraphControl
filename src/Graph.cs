@@ -1,65 +1,69 @@
-
 using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace AvaloniaGraphControl
+namespace AvaloniaGraphControl;
+
+public class Graph
 {
-  public class Graph
+  private readonly Dictionary<string, Node> _nodes = new();
+  private readonly Dictionary<object, Node?> _hierarchy = new();
+  public List<Edge> Edges => _edges;
+
+  public List<Node> Nodes => [.._nodes.Values];
+
+  // TODO: This is probably not very efficient, but it works for now.
+  public ICollection<Node> UnlinkedNodes => Nodes.FindAll(n => !Edges.Any(e => e.Tail == n || e.Head == n));
+
+  private readonly List<Edge> _edges;
+  public readonly Indexer<object, Node?> Parent;
+
+  public Orientations Orientation { get; set; }
+  public Func<object, object, int> HorizontalOrder { get; set; }
+  public Func<object, object, int> VerticalOrder { get; set; }
+  
+  protected Graph()
   {
-    private Dictionary<string, Node> nodes = new();
-    private readonly Dictionary<object, Node?> _hierarchy = new();
-    public ICollection<Edge> Edges => _edges;
-    public List<Node> Nodes => new(nodes.Values);
-    
-    public Graph()
+    _edges = new List<Edge>();
+    Parent = new Indexer<object, Node?>(k => _hierarchy.GetValueOrDefault(k), (k, v) => _hierarchy[k] = v);
+    Orientation = Orientations.Vertical;
+    HorizontalOrder = (_, _) => 0;
+    VerticalOrder = (_, _) => 0;
+  }
+
+  protected void AddNode(Node n)
+  {
+    if (_nodes.ContainsKey(n.Id))
     {
-      _edges = new List<Edge>();
-      Parent = new Indexer<object, Node?>(k => _hierarchy.GetValueOrDefault(k), (k, v) => _hierarchy[k] = v);
-      Orientation = Orientations.Vertical;
-      HorizontalOrder = (x1, x2) => 0;
-      VerticalOrder = (x1, x2) => 0;
+      return;
     }
 
-    public void AddNode(Node n)
+    _nodes[n.Id] = n;
+  }
+
+  protected void AddEdge(string sourceId, string targetId, string? label = null,
+    Edge.Symbol tailSymbol = Edge.Symbol.None, Edge.Symbol headSymbol = Edge.Symbol.None)
+  {
+    if (!_nodes.ContainsKey(sourceId))
     {
-      if (nodes.ContainsKey(n.Id))
-      {
-        return;
-      } 
-      nodes[n.Id] = n;
+      throw new ArgumentException($"Source node with id {sourceId} does not exist.");
     }
 
-    public void AddEdge(string sourceId, string targetId, string? label = null, Edge.Symbol tailSymbol = Edge.Symbol.None, Edge.Symbol headSymbol = Edge.Symbol.None)
+    if (!_nodes.ContainsKey(targetId))
     {
-      if (!nodes.ContainsKey(sourceId))
-      {
-        throw new ArgumentException($"Source node with id {sourceId} does not exist.");
-      }
-      
-      if (!nodes.ContainsKey(targetId))
-      {
-        throw new ArgumentException($"Target node with id {targetId} does not exist.");
-      }
-      var sourceNode = nodes[sourceId];
-      var targetNode = nodes[targetId];
-      var edge = new Edge(sourceNode, targetNode, label ?? string.Empty, tailSymbol, headSymbol);
-      _edges.Add(edge);
+      throw new ArgumentException($"Target node with id {targetId} does not exist.");
     }
-    
-    // TODO: This is probably not very efficient, but it works for now.
-    public ICollection<Node> UnlinkedNodes => Nodes.FindAll(n => !Edges.Any(e => e.Tail == n || e.Head == n));
-    
-    private readonly ICollection<Edge> _edges;
-    public readonly Indexer<object, Node?> Parent;
-    public enum Orientations
-    {
-      Vertical,
-      Horizontal
-    }
-    public Orientations Orientation { get; set; }
-    public Func<object, object, int> HorizontalOrder { get; set; }
-    public Func<object, object, int> VerticalOrder { get; set; }
 
+    var sourceNode = _nodes[sourceId];
+    var targetNode = _nodes[targetId];
+    var edge = new Edge(sourceNode, targetNode, label ?? string.Empty, tailSymbol, headSymbol);
+    _edges.Add(edge);
+  }
+
+
+  public enum Orientations
+  {
+    Vertical,
+    Horizontal
   }
 }
