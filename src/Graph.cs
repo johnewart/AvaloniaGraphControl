@@ -25,12 +25,12 @@ namespace AvaloniaGraphControl
     {
       if (nodes.ContainsKey(n.Id))
       {
-        throw new ArgumentException($"Node with id {n.Id} already exists.");
+        return;
       } 
       nodes[n.Id] = n;
     }
 
-    public void AddEdge(string sourceId, string targetId)
+    public void AddEdge(string sourceId, string targetId, string? label = null, Edge.Symbol tailSymbol = Edge.Symbol.None, Edge.Symbol headSymbol = Edge.Symbol.None)
     {
       if (!nodes.ContainsKey(sourceId))
       {
@@ -43,7 +43,7 @@ namespace AvaloniaGraphControl
       }
       var sourceNode = nodes[sourceId];
       var targetNode = nodes[targetId];
-      var edge = new Edge(sourceNode, targetNode);
+      var edge = new Edge(sourceNode, targetNode, label ?? string.Empty, tailSymbol, headSymbol);
       _edges.Add(edge);
     }
     

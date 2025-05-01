@@ -3,7 +3,7 @@ namespace AvaloniaGraphControl
 {
   public class Edge
   {
-    public Edge(Node tail, Node head, object label = null, Symbol tailSymbol = Symbol.None, Symbol headSymbol = Symbol.Arrow)
+    public Edge(Node tail, Node head, object label = null, Symbol tailSymbol = Symbol.None, Symbol headSymbol = Symbol.None)
     {
       Tail = tail;
       Head = head;

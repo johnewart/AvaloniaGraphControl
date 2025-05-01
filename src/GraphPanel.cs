@@ -44,6 +44,7 @@ namespace AvaloniaGraphControl
     public GraphPanel()
     {
       RenderTransformOrigin = new RelativePoint(0, 0, RelativeUnit.Absolute);
+      LayoutMethod = LayoutMethods.SugiyamaScheme;
     }
 
     private void CreateMSAGLGraphAndPopulatePanelWithAssociatedControls()
@@ -61,7 +62,13 @@ namespace AvaloniaGraphControl
       
       graph = new Microsoft.Msagl.Drawing.Graph
       {
-        LayoutAlgorithmSettings = CurrentLayoutSettings
+        // LayoutAlgorithmSettings = CurrentLayoutSettings
+        // LayoutAlgorithmSettings = new Microsoft.Msagl.Layout.Layered.SugiyamaLayoutSettings(),
+        LayoutAlgorithmSettings = new Microsoft.Msagl.Layout.MDS.MdsLayoutSettings(),
+        // LayoutAlgorithmSettings =
+        //
+        // new Microsoft.Msagl.Prototype.Ranking.RankingLayoutSettings(),
+        // LayoutAlgorithmSettings = new Microsoft.Msagl.Layout.Incremental.FastIncrementalLayoutSettings(),
       };
       graph.RootSubgraph.IsVisible = false;
       vmOfCtrl = new Dictionary<Control, Wrapper>();
@@ -110,7 +117,12 @@ namespace AvaloniaGraphControl
         var dEdge = graph.AddEdge(nodeVMs[evm.Tail].ID, nodeVMs[evm.Head].ID);
         dEdge.Attr.ArrowheadAtSource = Edge.GetArrowStyle(evm.TailSymbol);
         dEdge.Attr.ArrowheadAtTarget = Edge.GetArrowStyle(evm.HeadSymbol);
-        dEdge.LabelText = "x";
+        dEdge.LabelText = "OHAI";
+        dEdge.Label.FontSize = 6;
+        dEdge.Label.FontColor = Microsoft.Msagl.Drawing.Color.Gold;
+        dEdge.Label.IsVisible = true;
+        // dEdge.Attr.LineWidth = 2;
+        // dEdge.Attr.Color = Microsoft.Msagl.Drawing.Color.Gold;
         evm.DEdge = dEdge;
         CreateControl(evm, _ => new Connection(), 2);
       }
@@ -191,19 +203,16 @@ namespace AvaloniaGraphControl
       internal abstract void UpdateBounds(Control ctrl);
     }
 
-    class LabelWrapper : Wrapper
+    class LabelWrapper(object label, Microsoft.Msagl.Drawing.Label dLabel) : Wrapper(label, Guid.NewGuid().ToString())
     {
-      public LabelWrapper(object label, Microsoft.Msagl.Drawing.Label dLabel) : base(label, Guid.NewGuid().ToString())
-      {
-        DLabel = dLabel;
-      }
-
-      public readonly Microsoft.Msagl.Drawing.Label DLabel;
-      internal override Microsoft.Msagl.Core.Geometry.Rectangle GetBoundingBox() => DLabel.BoundingBox;
+      private readonly Microsoft.Msagl.Drawing.Label? _dLabel = dLabel;
+      internal override Microsoft.Msagl.Core.Geometry.Rectangle GetBoundingBox() => _dLabel?.BoundingBox ?? new Microsoft.Msagl.Core.Geometry.Rectangle(0, 0, 0, 0);
       internal override void UpdateBounds(Control ctrl)
-      {
-        DLabel.Width = ctrl.DesiredSize.Width;
-        DLabel.Height = ctrl.DesiredSize.Height;
+      { 
+        if (_dLabel == null)
+          return;
+        _dLabel.Width = ctrl.DesiredSize.Width;
+        _dLabel.Height = ctrl.DesiredSize.Height;
       }
     }
 
@@ -244,6 +253,7 @@ namespace AvaloniaGraphControl
       {
         Trace.TraceError("Msagl layout error {0}", e);
       }
+      Console.WriteLine("GraphPanel measure override");
       var graphDesiredSize = AglToAvalonia.Convert(graph.BoundingBox.Size);
       return graphDesiredSize;
     }
@@ -288,7 +298,7 @@ namespace AvaloniaGraphControl
          LayoutMethods.MDS => new Microsoft.Msagl.Layout.MDS.MdsLayoutSettings(),
          LayoutMethods.Ranking => new Microsoft.Msagl.Prototype.Ranking.RankingLayoutSettings(),
          LayoutMethods.IncrementalLayout => new Microsoft.Msagl.Layout.Incremental.FastIncrementalLayoutSettings(),
-         _ => new Microsoft.Msagl.Layout.Layered.SugiyamaLayoutSettings()
+         _ => new Microsoft.Msagl.Layout.Incremental.FastIncrementalLayoutSettings()
        };
   }
 }
