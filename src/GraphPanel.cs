@@ -5,6 +5,8 @@ using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
+using Avalonia.Media;
+using Microsoft.Msagl.Drawing;
 
 namespace AvaloniaGraphControl;
 
@@ -147,19 +149,23 @@ public class GraphPanel : Panel
       subgraph.AddNode(dNode);
     }
 
-    foreach (var evm in Graph.Edges)
+    foreach (var edge in Graph.Edges)
     {
-      var dEdge = _graphCanvas.AddEdge(nodeWrapperMap[evm.Tail].ID, nodeWrapperMap[evm.Head].ID);
-      dEdge.Attr.ArrowheadAtSource = Edge.GetArrowStyle(evm.TailSymbol);
-      dEdge.Attr.ArrowheadAtTarget = Edge.GetArrowStyle(evm.HeadSymbol);
+      var dEdge = _graphCanvas.AddEdge(nodeWrapperMap[edge.Tail].ID, nodeWrapperMap[edge.Head].ID);
+      dEdge.Attr.ArrowheadAtSource = Edge.GetArrowStyle(edge.TailSymbol);
+      dEdge.Attr.ArrowheadAtTarget = Edge.GetArrowStyle(edge.HeadSymbol);
+      
+      dEdge.Attr.AddStyle(Style.Dashed);
+      dEdge.Attr.Color  = Microsoft.Msagl.Drawing.Color.Gold;
       dEdge.LabelText = "OHAI";
       dEdge.Label.FontSize = 6;
       dEdge.Label.FontColor = Microsoft.Msagl.Drawing.Color.Gold;
       dEdge.Label.IsVisible = true;
       // dEdge.Attr.LineWidth = 2;
       // dEdge.Attr.Color = Microsoft.Msagl.Drawing.Color.Gold;
-      evm.DEdge = dEdge;
-      CreateControl(evm, _ => new Connection(), 2);
+      edge.DEdge = dEdge;
+      
+      CreateControl(edge, _ => new Connection() { Brush = Brushes.Black }, 2);
     }
 
     foreach (var nvm in leafNodes)
@@ -299,6 +305,7 @@ public class GraphPanel : Panel
       _ => new Microsoft.Msagl.Layout.Incremental.FastIncrementalLayoutSettings()
     };
 }
+
 
 abstract class Wrapper(object wrappedObject, string id)
 {
